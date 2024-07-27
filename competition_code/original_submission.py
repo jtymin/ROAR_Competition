@@ -80,54 +80,29 @@ class RoarCompetitionSolution:
             self.current_waypoint_idx,
             self.maneuverable_waypoints
         )
+         # We use the 3rd waypoint ahead of the current waypoint as the target waypoint
+        waypoint_to_follow = self.maneuverable_waypoints[(self.current_waypoint_idx + 3) % len(self.maneuverable_waypoints)]
 
-
-
-        lookahead_distance = int(np.clip(vehicle_velocity_norm / 3.0, 8, 20))  # Conservative lookahead
-
-        waypoint_to_follow = self.maneuverable_waypoints[(self.current_waypoint_idx + lookahead_distance) % len(self.maneuverable_waypoints)]
-
+        # Calculate delta vector towards the target waypoint
         vector_to_waypoint = (waypoint_to_follow.location - vehicle_location)[:2]
-        heading_to_waypoint = np.arctan2(vector_to_waypoint[1], vector_to_waypoint[0])
+        heading_to_waypoint = np.arctan2(vector_to_waypoint[1],vector_to_waypoint[0])
+
+        # Calculate delta angle towards the target waypoint
         delta_heading = normalize_rad(heading_to_waypoint - vehicle_rotation[2])
 
-        # Determine turn sharpness and adjust speed accordingly
-        turn_sharpness = abs(delta_heading)
-        if turn_sharpness > np.pi / 18:  # Conservative threshold for sharp turns
-            steering_smooth_factor = 6.0
-            target_speed = 25  # More conservative speed for sharp turns
-        else:
-            steering_smooth_factor = 4.0
-            target_speed = 75  # Increased speed for straighter sections
-
+        # Proportional controller to steer the vehicle towards the target waypoint
         steer_control = (
-            -steering_smooth_factor * delta_heading / np.pi
+            -8.0 / np.sqrt(vehicle_velocity_norm) * delta_heading / np.pi
         ) if vehicle_velocity_norm > 1e-2 else -np.sign(delta_heading)
         steer_control = np.clip(steer_control, -1.0, 1.0)
 
-        # Smooth throttle control for better acceleration management
-        throttle_control = 0.02 * (target_speed - vehicle_velocity_norm)
+        # Proportional controller to control the vehicle's speed towards 40 m/s
+        throttle_control = 0.05 * (20 - vehicle_velocity_norm)
 
-        # Implement predictive braking with earlier and more aggressive deceleration
-        brake_control = 0.0
-        if turn_sharpness > np.pi / 18:
-            if vehicle_velocity_norm > target_speed:
-                brake_control = np.clip(0.8 * (vehicle_velocity_norm - target_speed), 0.0, 1.0)
-        else:
-            if vehicle_velocity_norm > target_speed + 10:
-                brake_control = np.clip(0.5 * (vehicle_velocity_norm - target_speed), 0.0, 1.0)
-
-        # Additional safety measures
-        max_safe_speed = 90  # Safety speed limit
-        if vehicle_velocity_norm > max_safe_speed:
-            throttle_control = min(throttle_control - 0.3, 0.0)  # Reduce throttle if over speed limit
-            brake_control = min(brake_control + 0.3, 1.0)  # Increase braking if needed
-
-        # Ensure controls are within safe limits
         control = {
             "throttle": np.clip(throttle_control, 0.0, 1.0),
             "steer": steer_control,
-            "brake": brake_control,
+            "brake": np.clip(-throttle_control, 0.0, 1.0),
             "hand_brake": 0.0,
             "reverse": 0,
             "target_gear": 0
