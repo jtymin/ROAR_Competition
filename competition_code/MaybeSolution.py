@@ -93,34 +93,57 @@ class RoarCompetitionSolution:
 
         # Determine turn sharpness and adjust speed accordingly
         turn_sharpness = abs(delta_heading)
-        if turn_sharpness > np.pi / 18:  # Conservative threshold for sharp turns
-            steering_smooth_factor = 6.0
-            target_speed = 25  # More conservative speed for sharp turns
-        else:
-            steering_smooth_factor = 4.0
-            target_speed = 75  # Increased speed for straighter sections
 
+        # Look further ahead to detect sharp turns
+        sharp_turn_ahead = False
+        extended_lookahead_distance = lookahead_distance * 4  # Look further ahead
+        for i in range(1, extended_lookahead_distance):
+            idx1 = (self.current_waypoint_idx + i) % len(self.maneuverable_waypoints)
+            idx2 = (self.current_waypoint_idx + i + 1) % len(self.maneuverable_waypoints)
+            vec1 = self.maneuverable_waypoints[idx1].location[:2] - self.maneuverable_waypoints[self.current_waypoint_idx].location[:2]
+            vec2 = self.maneuverable_waypoints[idx2].location[:2] - self.maneuverable_waypoints[idx1].location[:2]
+            unit_vec1 = vec1 / np.linalg.norm(vec1)
+            unit_vec2 = vec2 / np.linalg.norm(vec2)
+            dot_product = np.dot(unit_vec1, unit_vec2)
+            angle = np.arccos(np.clip(dot_product, -1.0, 1.0))
+            if angle > np.pi / 5.8:  # 30 degrees
+                sharp_turn_ahead = True
+                break
+
+        if sharp_turn_ahead or turn_sharpness > np.pi / 3:  # Conservative threshold for sharp turns
+            steering_smooth_factor = 4.5  # Increased turning speed
+            target_speed = 43  # Speed during sharp turns
+        else:
+            steering_smooth_factor = 1.5  # Increased straight path turning speed
+            target_speed = 1440  # Speed for straighter sections
+
+        # Increase turning speed and reduce shaking
         steer_control = (
-            -steering_smooth_factor * delta_heading / np.pi
+            -steering_smooth_factor * delta_heading / (np.pi / 2)
         ) if vehicle_velocity_norm > 1e-2 else -np.sign(delta_heading)
-        steer_control = np.clip(steer_control, -1.0, 1.0)
+        steer_control = np.clip(steer_control, -2, 2)
+
+        # Ensure immediate acceleration at start
+        initial_throttle = 1.0 if vehicle_velocity_norm < 1e-2 else 0.05 * (target_speed - vehicle_velocity_norm)
 
         # Smooth throttle control for better acceleration management
-        throttle_control = 0.02 * (target_speed - vehicle_velocity_norm)
+        throttle_control = initial_throttle if vehicle_velocity_norm < 1e-2 else 0.05 * (target_speed - vehicle_velocity_norm)
 
         # Implement predictive braking with earlier and more aggressive deceleration
         brake_control = 0.0
-        if turn_sharpness > np.pi / 18:
+        if sharp_turn_ahead or turn_sharpness > np.pi / 18:  # If the turn is sharp
             if vehicle_velocity_norm > target_speed:
-                brake_control = np.clip(0.8 * (vehicle_velocity_norm - target_speed), 0.0, 1.0)
-        else:
+                brake_control = np.clip(1.0 * (vehicle_velocity_norm - target_speed), 0.0, 1.0)
+                # Immediately return to a higher target speed after braking
+                target_speed = 1800  # Higher speed after sharp turn
+        else:  # If the turn is not sharp
             if vehicle_velocity_norm > target_speed + 10:
-                brake_control = np.clip(0.5 * (vehicle_velocity_norm - target_speed), 0.0, 1.0)
+                brake_control = np.clip(0.6 * (vehicle_velocity_norm - target_speed), 0.0, 1.0)
 
         # Additional safety measures
-        max_safe_speed = 90  # Safety speed limit
+        max_safe_speed = 150  # Safety speed limit increased
         if vehicle_velocity_norm > max_safe_speed:
-            throttle_control = min(throttle_control - 0.3, 0.0)  # Reduce throttle if over speed limit
+            throttle_control = min(throttle_control-0.3, 0.0)  # Reduce throttle if over speed limit
             brake_control = min(brake_control + 0.3, 1.0)  # Increase braking if needed
 
         # Ensure controls are within safe limits
@@ -132,5 +155,24 @@ class RoarCompetitionSolution:
             "reverse": 0,
             "target_gear": 0
         }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         await self.vehicle.apply_action(control)
         return control
+
+
+
+
