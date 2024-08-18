@@ -695,7 +695,7 @@ class ThrottleController():
             return speed_data[0]
     
     def get_throttle_to_maintain_speed(self, current_speed: float):
-        throttle = 0.62 + current_speed/1000
+        throttle = 0.62 + current_speed/950
         return throttle
 
     def speed_for_turn(self, distance: float, target_speed: float, current_speed: float):
