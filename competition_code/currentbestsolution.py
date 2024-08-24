@@ -298,27 +298,27 @@ class RoarCompetitionSolution:
     def get_lateral_pid_config(self):
         conf = {
         "60": {
-                "Kp": 0.9,
+                "Kp": 0.8,
                 "Kd": 0.05,
                 "Ki": 0.05
         },
         "70": {
-                "Kp": 0.8,
+                "Kp": 0.7,
                 "Kd": 0.07,
                 "Ki": 0.07
         },
         "80": {
-                "Kp": 0.69,
+                "Kp": 0.66,
                 "Kd": 0.08,
                 "Ki": 0.08
         },
         "90": {
-                "Kp": 0.66,
+                "Kp": 0.63,
                 "Kd": 0.09,
                 "Ki": 0.09
         },
         "100": {
-                "Kp": 0.58,
+                "Kp": 0.6,
                 "Kd": 0.1,
                 "Ki": 0.1
         },
@@ -338,17 +338,17 @@ class RoarCompetitionSolution:
                 "Ki": 0.09
         },
         "160": {
-                "Kp": 0.5,
-                "Kd": 0.04,
+                "Kp": 0.4,
+                "Kd": 0.05,
                 "Ki": 0.06
         },
         "180": {
-                "Kp": 0.66,
-                "Kd": 0.01,
+                "Kp": 0.28,
+                "Kd": 0.02,
                 "Ki": 0.05
         },
         "200": {
-                "Kp": 0.36,
+                "Kp": 0.28,
                 "Kd": 0.03,
                 "Ki": 0.04
         },
@@ -619,13 +619,13 @@ class ThrottleController():
         percent_change_per_tick = 0.07 # speed drop for one time-tick of braking
         speed_up_threshold = 0.99
         throttle_decrease_multiple = 0.80
-        throttle_increase_multiple = 1.3
+        throttle_increase_multiple = 1.29
         percent_speed_change = (speed_data.current_speed - self.previous_speed) / (self.previous_speed + 0.0001) # avoid division by zero
 
         if percent_of_max > 1:
             # Consider slowing down
             brake_threshold_multiplier = 1.0
-            if speed_data.current_speed > 2500:
+            if speed_data.current_speed > 200:
                 brake_threshold_multiplier = 1.0
             if percent_of_max > 1 + (brake_threshold_multiplier * percent_change_per_tick):
                 if self.brake_ticks > 0:
@@ -695,7 +695,7 @@ class ThrottleController():
             return speed_data[0]
     
     def get_throttle_to_maintain_speed(self, current_speed: float):
-        throttle = 0.61 + current_speed/1000
+        throttle = 0.62 + current_speed/1000
         return throttle
 
     def speed_for_turn(self, distance: float, target_speed: float, current_speed: float):
@@ -705,7 +705,7 @@ class ThrottleController():
 
     def speed_for_turn_fix_physics(self, distance: float, target_speed: float, current_speed: float):
         # fix physics
-        braking_decceleration = 64.0 # try 11, 14, 56
+        braking_decceleration = 66.0 # try 11, 14, 56
         max_speed = math.sqrt((target_speed**2) + 2 * distance * (braking_decceleration + 9.81))
         return SpeedData(distance, current_speed, target_speed, max_speed)
 
@@ -766,7 +766,7 @@ class ThrottleController():
             return self.max_speed
         #self.section_indeces = [198, 438, 547, 691, 803, 884, 1287, 1508, 1854, 1968, 2264, 2662, 2770]
         #old section indeces = [0, 277, 554, 831, 1108, 1662, 1939, 2216, 2493]
-        mu = 2.8
+        mu = 2.5
         if current_section == 0:
             mu = 2.8
         if current_section == 1:
@@ -782,7 +782,7 @@ class ThrottleController():
         if current_section == 6:
             mu = 1.95
         if current_section == 7:
-            mu = 1.1
+            mu = 1.3
         # if current_section == 7 and current_speed<150:
         #     mu = 1.8
         if current_section == 8:
